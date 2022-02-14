@@ -11,7 +11,7 @@ export class Category {
     @Column()
     categoryName : string;
 
-    @Column({type:"string",length:"6"})
+    @Column()
     categoryColor : string;
 
     @OneToMany(type=>Time, time=>time.category)
