@@ -1,11 +1,12 @@
 import "reflect-metadata";
-import {createConnection} from "typeorm";
+import {createConnection, getRepository} from "typeorm";
 import * as express from "express";
 import * as bodyParser from "body-parser";
 import {Request, Response} from "express";
 import {Routes} from "./routes";
 import {User} from "./entity/User";
 import { Category } from "./entity/Category";
+import { Time } from "./entity/Time";
 
 createConnection().then(async connection => {
 
@@ -28,6 +29,7 @@ createConnection().then(async connection => {
 
     let userRepository = connection.getRepository(User)
     let categoryRepository = connection.getRepository(Category)
+    let timesRepository = connection.getRepository(Time)
     
     // Get All Users
     app.get('/users/', async function(req:Request, res:Response) {
@@ -72,11 +74,9 @@ createConnection().then(async connection => {
 
     // Get All Categories Of A User
     app.get("/categories/:id", async function(req:Request, res:Response) {
-        const results = await userRepository.findOne(req.params.id, {relations: ["categories"]});
-        if (!results) {
-            return res.status(404).send("User Not Found");
-        }
-            return res.send(results);
+        const id = req.params.id
+        const results = await getRepository(Category).createQueryBuilder("category").leftJoinAndSelect("category.times","time").leftJoinAndSelect("category.user","user").where("category.user.userId = :id", { id }).getMany();
+        return res.send(results);
     })
 
     // Search For A Specific Category With ID
@@ -125,6 +125,61 @@ createConnection().then(async connection => {
         const results = await categoryRepository.delete(req.params.id);
         if (results["affected"] === 0) {
             return res.status(404).send("Category Not Found");
+        }
+        return res.send(results);
+    })
+
+    // Show All Times Logged Of A User
+    app.get("/times/:id", async function (req:Request,res:Response) {
+        const id = req.params.id
+        const results = await getRepository(Time).createQueryBuilder("time").leftJoinAndSelect("time.category","category").leftJoinAndSelect("time.user","user").where("time.user.userId = :id", { id }).getMany();
+        return res.send(results);
+    })
+
+    // Get One Time Logged
+    app.get("/time/:id", async function (req:Request, res:Response) {
+        const results = await timesRepository.findOne(req.params.id);
+        if (!results) {
+            return res.status(404).send("Time Logged Not Found");
+        }
+        return res.send(results);
+    })
+
+    // Create A Time Log
+    app.post("/time/:id", async function (req:Request, res:Response) {
+        const user = await userRepository.findOne(req.params.id);
+        if (!user) {
+            return res.status(404).send("User Not Found");
+        }
+
+        req.body = {
+            ...req.body,
+            "user":user,
+        };
+
+        req.body["startTime"] = new Date(req.body["startTime"]);
+        const time = timesRepository.create(req.body);
+        const result = await timesRepository.save(time);
+
+        return res.send(result);
+    })
+
+    // Update Time Log
+    app.put("/time/:id", async function (req:Request, res:Response) {
+        const time = await timesRepository.findOne(req.params.id);
+        if (!time) {
+            return res.status(404).send("Time Log Not Found")
+        }
+        timesRepository.merge(time,req.body);
+        const results = timesRepository.save(time);
+        return res.send(results);
+    })
+
+    // Delete Time Log
+    app.delete("/time/:id", async function (req:Request, res:Response) {
+        const results = await timesRepository.delete(req.params.id);
+        if (results["affected"] === 0) {
+            return res.status(404).send("Time Log Not Found");
         }
         return res.send(results);
     })
