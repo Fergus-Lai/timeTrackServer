@@ -7,7 +7,9 @@ import {Routes} from "./routes";
 import {User} from "./entity/User";
 import { Category } from "./entity/Category";
 import { Time } from "./entity/Time";
-import { randomBytes, pbkdf2Sync} from "crypto";
+import { randomBytes, pbkdf2Sync, createHash} from "crypto";
+
+require('dotenv').config();
 
 createConnection().then(async connection => {
 
@@ -31,23 +33,39 @@ createConnection().then(async connection => {
     let userRepository = connection.getRepository(User)
     let categoryRepository = connection.getRepository(Category)
     let timesRepository = connection.getRepository(Time)
+
+    function apiCheck(key:string) {
+        key = createHash("md5").update(key).digest('hex');
+        return key === process.env.key
+    }
+
     
     // Get All Users
-    app.get('/users/', async function(req:Request, res:Response) {
-        userRepository.find()
+    app.get('/users/:api/', async function(req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
+        const results = await userRepository.find();
+        return res.send(results);
     })
 
     // Searching User By ID
-    app.get('/user/:id', async function(req:Request, res:Response) {
-        const results = await userRepository.findOne(req.params.id);
-        if (!results) {
-            return res.status(404).send("User Not Found");
+    app.get('/user/:api/:id', async function(req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
         }
-            return res.send(results);
+        const results = await userRepository.findOne(req.params.id);
+            if (!results) {
+                return res.status(404).send("User Not Found");
+            }
+                return res.send(results);
     });
 
     // Creating User
-    app.post("/user/", async function(req: Request, res: Response) {
+    app.post("/user/:api/", async function(req: Request, res: Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         var salt = randomBytes(16).toString('hex');
 
         req.body = {
@@ -55,15 +73,17 @@ createConnection().then(async connection => {
             "salt":salt,
         }
         // Hashing user's salt and password with 1000 iterations, 64 length and sha512 digest
-        req.body["password"] = pbkdf2Sync(req.body["password"], salt, 
-            1000, 64, `sha512`).toString(`hex`);
+        req.body["password"] = pbkdf2Sync(req.body["password"], salt, 1000, 64, `sha512`).toString(`hex`);
         const user = userRepository.create(req.body);
         const results = await userRepository.save(user);
         return res.send(results);
     });
 
     // Log In
-    app.post("/login", async function(req:Request, res:Response) {
+    app.post("/login/:api/", async function(req:Request, res:Response) {
+        if (!(apiCheck(req.params.api))) {
+            return res.sendStatus(403);
+        };
         const user = await userRepository.findOne({"email":req.body["email"]});
         if (!user) {
             res.status(404).send("User Not Found")
@@ -79,7 +99,10 @@ createConnection().then(async connection => {
 
 
     // Updating User
-    app.put("/user/:id", async function(req:Request, res:Response) {
+    app.put("/user/:api/:id/", async function(req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         const user = await userRepository.findOne(req.params.id);
         if (!user) {
             return res.status(404).send("User Not Found");
@@ -90,7 +113,10 @@ createConnection().then(async connection => {
     })
 
     // Deleting User
-    app.delete("/user/:id", async function(req:Request, res:Response) {
+    app.delete("/user/:api/:id/", async function(req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         const results = await userRepository.delete(req.params.id);
         if (results["affected"] === 0) {
             return res.status(404).send("User Not Found");
@@ -99,14 +125,20 @@ createConnection().then(async connection => {
     })
 
     // Get All Categories Of A User
-    app.get("/categories/:id", async function(req:Request, res:Response) {
+    app.get("/categories/:api/:id/", async function(req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         const id = req.params.id
         const results = await getRepository(Category).createQueryBuilder("category").leftJoinAndSelect("category.times","time").leftJoinAndSelect("category.user","user").where("category.user.userId = :id", { id }).getMany();
         return res.send(results);
     })
 
     // Search For A Specific Category With ID
-    app.get("/categories/:id", async function(req:Request,res:Response) {
+    app.get("/categories/:api/:id", async function(req:Request,res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         const results = await categoryRepository.findOne(req.params.id);
         if (!results) {
             return res.status(404).send("Category Not Found");
@@ -115,7 +147,10 @@ createConnection().then(async connection => {
     })
 
     // Create Category
-    app.post("/category/:id", async function(req:Request, res:Response) {
+    app.post("/category/:api/:id", async function(req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         
         const user = await userRepository.findOne(req.params.id);
 
@@ -136,7 +171,11 @@ createConnection().then(async connection => {
     })
     
     // Update Category
-    app.put("/category/:id", async function(req:Request,res:Response) {
+    app.put("/category/:api/:id", async function(req:Request,res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
+
         const category = await categoryRepository.findOne(req.params.id);
         if (!category) {
             return res.status(404).send("Category Not Found");
@@ -147,7 +186,11 @@ createConnection().then(async connection => {
     })
 
     // Delete Category
-    app.delete("/category/:id", async function(req:Request,res:Response) {
+    app.delete("/category/:api/:id", async function(req:Request,res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
+
         const results = await categoryRepository.delete(req.params.id);
         if (results["affected"] === 0) {
             return res.status(404).send("Category Not Found");
@@ -156,14 +199,20 @@ createConnection().then(async connection => {
     })
 
     // Show All Times Logged Of A User
-    app.get("/times/:id", async function (req:Request,res:Response) {
+    app.get("/times/:api/:id", async function (req:Request,res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         const id = req.params.id
         const results = await getRepository(Time).createQueryBuilder("time").leftJoinAndSelect("time.category","category").leftJoinAndSelect("time.user","user").where("time.user.userId = :id", { id }).getMany();
         return res.send(results);
     })
 
     // Get One Time Logged
-    app.get("/time/:id", async function (req:Request, res:Response) {
+    app.get("/time/:api/:id", async function (req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         const results = await timesRepository.findOne(req.params.id);
         if (!results) {
             return res.status(404).send("Time Logged Not Found");
@@ -172,7 +221,10 @@ createConnection().then(async connection => {
     })
 
     // Create A Time Log
-    app.post("/time/:id", async function (req:Request, res:Response) {
+    app.post("/time/:api/:id", async function (req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         const user = await userRepository.findOne(req.params.id);
         if (!user) {
             return res.status(404).send("User Not Found");
@@ -191,7 +243,10 @@ createConnection().then(async connection => {
     })
 
     // Update Time Log
-    app.put("/time/:id", async function (req:Request, res:Response) {
+    app.put("/time/:api/:id", async function (req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         const time = await timesRepository.findOne(req.params.id);
         if (!time) {
             return res.status(404).send("Time Log Not Found")
@@ -202,7 +257,10 @@ createConnection().then(async connection => {
     })
 
     // Delete Time Log
-    app.delete("/time/:id", async function (req:Request, res:Response) {
+    app.delete("/time/:api/:id", async function (req:Request, res:Response) {
+        if (!apiCheck(req.params.api)) {
+            return res.sendStatus(403);
+        };
         const results = await timesRepository.delete(req.params.id);
         if (results["affected"] === 0) {
             return res.status(404).send("Time Log Not Found");
