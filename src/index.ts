@@ -7,6 +7,7 @@ import {Routes} from "./routes";
 import {User} from "./entity/User";
 import { Category } from "./entity/Category";
 import { Time } from "./entity/Time";
+import { randomBytes, pbkdf2Sync} from "crypto";
 
 createConnection().then(async connection => {
 
@@ -47,10 +48,35 @@ createConnection().then(async connection => {
 
     // Creating User
     app.post("/user/", async function(req: Request, res: Response) {
+        var salt = randomBytes(16).toString('hex');
+
+        req.body = {
+            ...req.body,
+            "salt":salt,
+        }
+        // Hashing user's salt and password with 1000 iterations, 64 length and sha512 digest
+        req.body["password"] = pbkdf2Sync(req.body["password"], salt, 
+            1000, 64, `sha512`).toString(`hex`);
         const user = userRepository.create(req.body);
         const results = await userRepository.save(user);
         return res.send(results);
     });
+
+    // Log In
+    app.post("/login", async function(req:Request, res:Response) {
+        const user = await userRepository.findOne({"email":req.body["email"]});
+        if (!user) {
+            res.status(404).send("User Not Found")
+        };
+
+        if (user.validPassword(req.body["password"])) {
+            return res.status(201).send(
+                "User Logged In",
+            )
+        }
+        return res.status(400).send("Wrong Password");
+    })
+
 
     // Updating User
     app.put("/user/:id", async function(req:Request, res:Response) {
