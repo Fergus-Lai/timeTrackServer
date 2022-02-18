@@ -4,4 +4,7 @@ node_modules/
 build/
 tmp/
 temp/
-.env
+env.list
+docker-compose.yml
+.dockerignore
+Dockerfile
