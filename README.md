@@ -1,7 +1,1 @@
-# Awesome Project Build with TypeORM
-
-Steps to run this project:
-
-1. Run `npm i` command
-2. Setup database settings inside `ormconfig.json` file
-3. Run `npm start` command
+This project has been terminated due to the realization of my own requirements for the app to work in an offline environment
